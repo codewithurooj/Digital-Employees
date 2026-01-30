@@ -1,0 +1,104 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Credentials (NEVER commit these)
+config/gmail_credentials.json
+config/gmail_token.json
+config/whatsapp_session/
+**/token.json
+**/credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# UV
+.uv/
+uv.lock
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Obsidian
+AI_Employee_Vault/.obsidian/workspace.json
+AI_Employee_Vault/.obsidian/workspace-mobile.json
+
+# Sensitive Vault Folders (extra protection)
+AI_Employee_Vault/Accounting/*.pdf
+AI_Employee_Vault/Invoices/*.pdf
+
+# Logs (optional - may want to keep for debugging)
+# AI_Employee_Vault/Logs/
+
+# Playwright
+playwright/.auth/
+
+# Cloud Deployment Secrets
+deploy/cloud/.env
+deploy/cloud/addons/
+
+# Docker
+*.log.*
+docker-compose.override.yml
+
+# Process Manager
+.pm2/
+
+# SSL Certificates (generated)
+deploy/cloud/*.crt
+deploy/cloud/*.key
+deploy/cloud/*.pem
+
+# Backup files
+/backup/
+
+# Logs directory (runtime)
+logs/*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+nul

@@ -1,0 +1,317 @@
+# Cloud Orchestrator API Contract
+# Platinum Tier - Always-On Cloud Agent
+
+openapi: 3.0.0
+info:
+  title: Cloud Orchestrator API
+  version: 1.0.0
+  description: |
+    Internal API for the cloud agent orchestrator. This is NOT exposed externally;
+    it defines the contract between components within the cloud agent.
+
+components:
+  schemas:
+    AgentStatus:
+      type: object
+      required:
+        - agent_id
+        - work_zone
+        - status
+        - uptime_seconds
+      properties:
+        agent_id:
+          type: string
+          enum: [cloud]
+          description: Always 'cloud' for cloud orchestrator
+        work_zone:
+          type: string
+          enum: [cloud]
+          description: Work zone (determines permissions)
+        status:
+          type: string
+          enum: [running, paused, stopping]
+          description: Current orchestrator status
+        uptime_seconds:
+          type: integer
+          description: Seconds since orchestrator started
+        active_watchers:
+          type: array
+          items:
+            type: string
+          description: List of running watchers
+          example: [gmail, filesystem, odoo]
+        active_tasks:
+          type: integer
+          description: Number of tasks currently being processed
+        queue_depth:
+          type: object
+          properties:
+            needs_action:
+              type: integer
+            pending_approval:
+              type: integer
+            in_progress:
+              type: integer
+        last_sync:
+          type: string
+          format: date-time
+          description: Last successful Git sync
+        dry_run:
+          type: boolean
+          description: Whether operating in dry-run mode
+
+    TaskResult:
+      type: object
+      required:
+        - task_id
+        - status
+        - agent_id
+      properties:
+        task_id:
+          type: string
+          description: Unique task identifier
+        status:
+          type: string
+          enum: [completed, pending_approval, failed, released]
+        agent_id:
+          type: string
+          enum: [cloud]
+        result_path:
+          type: string
+          description: Path to result file (approval request or done)
+        iterations:
+          type: integer
+          description: Number of reasoning loop iterations
+        duration_ms:
+          type: integer
+          description: Task processing duration
+
+    SyncResult:
+      type: object
+      required:
+        - success
+        - timestamp
+      properties:
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        commit_hash:
+          type: string
+          description: Git commit hash after push
+        files_changed:
+          type: integer
+        error:
+          type: string
+          description: Error message if sync failed
+
+    HealthCheckResult:
+      type: object
+      required:
+        - healthy
+        - timestamp
+      properties:
+        healthy:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        processes:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [running, stopped, restarting]
+              pid:
+                type: integer
+              memory_mb:
+                type: number
+        apis:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              connected:
+                type: boolean
+              latency_ms:
+                type: integer
+        resources:
+          type: object
+          properties:
+            cpu_percent:
+              type: number
+            memory_percent:
+              type: number
+            disk_percent:
+              type: number
+
+paths:
+  /status:
+    get:
+      operationId: get_status
+      summary: Get cloud orchestrator status
+      description: Returns current status of the cloud orchestrator including queue depths
+      responses:
+        '200':
+          description: Orchestrator status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatus'
+
+  /process:
+    post:
+      operationId: process_inbox_cloud
+      summary: Process inbox items (cloud-side)
+      description: |
+        Triggers processing of items in Needs_Action folder.
+        Cloud agent processes items in draft-only mode:
+        - Creates draft responses for emails
+        - Creates draft invoices (not posted)
+        - Creates approval requests for sensitive actions
+
+        NEVER executes: send_email, post_social, execute_payment
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                domain:
+                  type: string
+                  enum: [email, accounting, social, all]
+                  default: all
+                  description: Which domain to process
+                max_items:
+                  type: integer
+                  default: 10
+                  description: Maximum items to process
+      responses:
+        '200':
+          description: Processing results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskResult'
+
+  /sync:
+    post:
+      operationId: sync_vault
+      summary: Trigger Git sync
+      description: |
+        Commits pending changes and pushes to remote.
+        Automatically called after task completion.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Custom commit message
+                  default: "cloud: auto-sync"
+      responses:
+        '200':
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+        '409':
+          description: Sync conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  conflicting_files:
+                    type: array
+                    items:
+                      type: string
+
+  /health:
+    get:
+      operationId: health_check
+      summary: Health check endpoint
+      description: |
+        Returns health status of all cloud agent components.
+        Used by PM2 and external monitoring.
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResult'
+        '503':
+          description: Unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResult'
+
+  /watchers:
+    get:
+      operationId: list_watchers
+      summary: List active watchers
+      responses:
+        '200':
+          description: Watcher list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  watchers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        status:
+                          type: string
+                          enum: [running, stopped, error]
+                        last_check:
+                          type: string
+                          format: date-time
+                        items_today:
+                          type: integer
+
+# Work-Zone Enforcement
+x-work-zone-rules:
+  cloud-allowed:
+    - read_vault
+    - write_needs_action
+    - write_drafts
+    - write_updates
+    - write_in_progress_cloud
+    - create_approval_request
+    - sync_git
+    - read_api_gmail
+    - read_api_odoo
+
+  cloud-blocked:
+    - send_email
+    - post_social
+    - execute_payment
+    - approve_request
+    - write_dashboard
+    - write_in_progress_local
+    - whatsapp_any_operation
+    - banking_any_operation

@@ -1,0 +1,461 @@
+# Health Monitor API Contract
+# Platinum Tier - Cloud Agent Health Monitoring
+
+openapi: 3.0.0
+info:
+  title: Health Monitor API
+  version: 1.0.0
+  description: |
+    Health monitoring and auto-recovery for the cloud agent.
+    Integrated with PM2 for process management.
+
+    ## Monitoring Targets
+    - PM2 processes (orchestrator, watchers)
+    - API connectivity (Gmail, Odoo)
+    - System resources (CPU, memory, disk)
+    - Git sync status
+
+    ## Auto-Recovery
+    - Restart failed processes via PM2
+    - Alert on consecutive failures
+    - Log all incidents to vault
+
+components:
+  schemas:
+    ProcessStatus:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          description: PM2 process name
+          example: cloud-orchestrator
+        status:
+          type: string
+          enum: [running, stopped, errored, restarting]
+        pid:
+          type: integer
+          description: Process ID
+        uptime_seconds:
+          type: integer
+        memory_mb:
+          type: number
+        cpu_percent:
+          type: number
+        restarts:
+          type: integer
+          description: Number of restarts since PM2 start
+        last_restart:
+          type: string
+          format: date-time
+
+    ApiStatus:
+      type: object
+      required:
+        - service
+        - connected
+      properties:
+        service:
+          type: string
+          enum: [gmail, odoo, github]
+        connected:
+          type: boolean
+        last_check:
+          type: string
+          format: date-time
+        last_success:
+          type: string
+          format: date-time
+        latency_ms:
+          type: integer
+        errors_1h:
+          type: integer
+          description: Error count in last hour
+        error_message:
+          type: string
+          description: Last error message if any
+
+    ResourceMetrics:
+      type: object
+      required:
+        - cpu_percent
+        - memory_percent
+        - disk_percent
+      properties:
+        cpu_percent:
+          type: number
+          description: CPU usage percentage
+        memory_percent:
+          type: number
+          description: Memory usage percentage
+        memory_used_mb:
+          type: integer
+        memory_total_mb:
+          type: integer
+        disk_percent:
+          type: number
+          description: Disk usage percentage
+        disk_used_gb:
+          type: number
+        disk_total_gb:
+          type: number
+        network_in_mb:
+          type: number
+          description: Network received in last hour
+        network_out_mb:
+          type: number
+          description: Network sent in last hour
+
+    Thresholds:
+      type: object
+      properties:
+        cpu_warning:
+          type: integer
+          default: 70
+        cpu_critical:
+          type: integer
+          default: 90
+        memory_warning:
+          type: integer
+          default: 80
+        memory_critical:
+          type: integer
+          default: 95
+        disk_warning:
+          type: integer
+          default: 85
+        disk_critical:
+          type: integer
+          default: 95
+        api_error_threshold:
+          type: integer
+          default: 5
+          description: Consecutive errors before alert
+        process_restart_max:
+          type: integer
+          default: 10
+          description: Max restarts before human alert
+
+    Incident:
+      type: object
+      required:
+        - id
+        - timestamp
+        - type
+        - severity
+      properties:
+        id:
+          type: string
+          description: Unique incident ID
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum: [process_crash, api_failure, resource_critical, sync_failure]
+        severity:
+          type: string
+          enum: [warning, error, critical]
+        component:
+          type: string
+          description: Affected component
+        message:
+          type: string
+        resolved:
+          type: boolean
+          default: false
+        resolved_at:
+          type: string
+          format: date-time
+        resolution:
+          type: string
+          description: How the incident was resolved
+
+    HealthReport:
+      type: object
+      required:
+        - healthy
+        - timestamp
+        - agent_id
+      properties:
+        healthy:
+          type: boolean
+          description: Overall health status
+        status:
+          type: string
+          enum: [healthy, degraded, critical]
+        timestamp:
+          type: string
+          format: date-time
+        agent_id:
+          type: string
+          const: cloud
+        uptime_percent_24h:
+          type: number
+        uptime_percent_30d:
+          type: number
+        processes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessStatus'
+        apis:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiStatus'
+        resources:
+          $ref: '#/components/schemas/ResourceMetrics'
+        thresholds:
+          $ref: '#/components/schemas/Thresholds'
+        active_incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Incident'
+        incidents_24h:
+          type: integer
+
+    AlertRequest:
+      type: object
+      required:
+        - message
+        - severity
+      properties:
+        message:
+          type: string
+          description: Alert message
+        severity:
+          type: string
+          enum: [info, warning, error, critical]
+        component:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+paths:
+  /health:
+    get:
+      operationId: get_health
+      summary: Get complete health report
+      description: |
+        Returns comprehensive health status for all components.
+        Used for monitoring dashboard and alerting.
+      responses:
+        '200':
+          description: Health report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+
+  /process/{name}:
+    get:
+      operationId: check_process
+      summary: Check specific process status
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: PM2 process name
+      responses:
+        '200':
+          description: Process status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessStatus'
+        '404':
+          description: Process not found
+
+  /process/{name}/restart:
+    post:
+      operationId: restart_process
+      summary: Restart a process via PM2
+      description: |
+        Triggers a process restart through PM2.
+        Used for auto-recovery on failure.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for restart
+                force:
+                  type: boolean
+                  default: false
+                  description: Force restart even if running
+      responses:
+        '200':
+          description: Restart initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  new_pid:
+                    type: integer
+
+  /api/{service}:
+    get:
+      operationId: check_api
+      summary: Check API connectivity
+      parameters:
+        - name: service
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [gmail, odoo, github]
+      responses:
+        '200':
+          description: API status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatus'
+
+  /metrics:
+    get:
+      operationId: get_metrics
+      summary: Get resource metrics
+      responses:
+        '200':
+          description: Resource metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceMetrics'
+
+  /incidents:
+    get:
+      operationId: list_incidents
+      summary: List recent incidents
+      parameters:
+        - name: active_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter incidents since this time
+      responses:
+        '200':
+          description: Incident list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incidents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Incident'
+
+  /alert:
+    post:
+      operationId: send_alert
+      summary: Send an alert notification
+      description: |
+        Sends an alert for critical failures.
+        Notification methods: vault file, email (if configured), webhook.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+      responses:
+        '200':
+          description: Alert sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alert_id:
+                    type: string
+                  delivered_to:
+                    type: array
+                    items:
+                      type: string
+
+  /thresholds:
+    get:
+      operationId: get_thresholds
+      summary: Get current thresholds
+      responses:
+        '200':
+          description: Thresholds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thresholds'
+    put:
+      operationId: update_thresholds
+      summary: Update monitoring thresholds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thresholds'
+      responses:
+        '200':
+          description: Thresholds updated
+
+# Health Check Schedule
+x-health-schedule:
+  check_interval_seconds: 60
+  process_check: true
+  api_check: true
+  resource_check: true
+  sync_check: true
+
+  auto_recovery:
+    enabled: true
+    max_restarts: 10
+    restart_delay_seconds: 5
+    backoff_multiplier: 2
+
+  alerting:
+    vault_file: /Health/alerts.md
+    email_enabled: false  # Configure separately
+    webhook_enabled: false  # Configure separately
+
+  retention:
+    incidents_days: 90
+    metrics_hours: 24
+
+# PM2 Process Configuration
+x-pm2-processes:
+  - name: cloud-orchestrator
+    critical: true
+    restart_on_failure: true
+  - name: health-monitor
+    critical: true
+    restart_on_failure: true
+  - name: gmail-watcher
+    critical: false
+    restart_on_failure: true
+  - name: odoo-watcher
+    critical: false
+    restart_on_failure: true

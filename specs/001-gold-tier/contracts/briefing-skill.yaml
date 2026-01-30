@@ -1,0 +1,442 @@
+openapi: 3.0.3
+info:
+  title: CEO Briefing Skill API
+  description: |
+    Skill contract for weekly CEO briefing generation.
+    Aggregates accounting, task, and business goal data into executive summary.
+  version: 1.0.0
+  contact:
+    name: AI Employee Gold Tier
+
+servers:
+  - url: internal://skill
+    description: Internal skill execution
+
+paths:
+  /briefing/generate:
+    post:
+      summary: Generate weekly CEO briefing
+      description: |
+        Generates a comprehensive CEO briefing by aggregating data from:
+        - Accounting folder (invoices, payments)
+        - Done folder (completed tasks)
+        - Needs_Action folder (bottleneck analysis)
+        - Business_Goals.md (target comparison)
+      operationId: generateBriefing
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BriefingRequest'
+      responses:
+        '200':
+          description: Briefing generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BriefingResponse'
+        '500':
+          description: Generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /briefing/revenue:
+    get:
+      summary: Get revenue summary for a period
+      operationId: getRevenueSummary
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Revenue summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueSummary'
+
+  /briefing/tasks:
+    get:
+      summary: Get task completion summary
+      operationId: getTaskSummary
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Task summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskSummary'
+
+  /briefing/bottlenecks:
+    get:
+      summary: Get current bottlenecks
+      operationId: getBottlenecks
+      parameters:
+        - name: age_threshold_hours
+          in: query
+          schema:
+            type: integer
+            default: 48
+          description: Items older than this are bottlenecks
+      responses:
+        '200':
+          description: Bottleneck analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BottleneckAnalysis'
+
+  /briefing/suggestions:
+    post:
+      summary: Generate proactive suggestions
+      description: |
+        Analyzes patterns in accounting and task data to generate
+        actionable cost optimization and efficiency suggestions.
+      operationId: generateSuggestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestionRequest'
+      responses:
+        '200':
+          description: Suggestions generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Suggestions'
+
+components:
+  schemas:
+    BriefingRequest:
+      type: object
+      properties:
+        period_start:
+          type: string
+          format: date
+          description: Start of reporting period (default: 7 days ago)
+        period_end:
+          type: string
+          format: date
+          description: End of reporting period (default: today)
+        include_sections:
+          type: array
+          items:
+            type: string
+            enum:
+              - revenue_summary
+              - expense_summary
+              - task_completion
+              - bottlenecks
+              - suggestions
+              - goals_progress
+          default:
+            - revenue_summary
+            - expense_summary
+            - task_completion
+            - bottlenecks
+            - suggestions
+            - goals_progress
+        suggestion_count:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 2
+          description: Number of proactive suggestions to generate
+
+    BriefingResponse:
+      type: object
+      required:
+        - success
+        - vault_file
+        - briefing
+      properties:
+        success:
+          type: boolean
+        vault_file:
+          type: string
+          description: Path to briefing file in vault
+        generated_at:
+          type: string
+          format: date-time
+        briefing:
+          $ref: '#/components/schemas/BriefingContent'
+        generation_time_ms:
+          type: integer
+
+    BriefingContent:
+      type: object
+      required:
+        - period
+        - executive_summary
+      properties:
+        period:
+          type: object
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        executive_summary:
+          type: string
+          description: 2-3 sentence overview
+        revenue:
+          $ref: '#/components/schemas/RevenueSummary'
+        expenses:
+          $ref: '#/components/schemas/ExpenseSummary'
+        tasks:
+          $ref: '#/components/schemas/TaskSummary'
+        bottlenecks:
+          $ref: '#/components/schemas/BottleneckAnalysis'
+        suggestions:
+          $ref: '#/components/schemas/Suggestions'
+        goals_progress:
+          $ref: '#/components/schemas/GoalsProgress'
+
+    RevenueSummary:
+      type: object
+      required:
+        - total
+        - by_source
+      properties:
+        total:
+          type: number
+          format: float
+        vs_last_period:
+          type: number
+          format: float
+          description: Percentage change from previous period
+        by_source:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+              amount:
+                type: number
+              change_percent:
+                type: number
+        outstanding_invoices:
+          type: array
+          items:
+            type: object
+            properties:
+              number:
+                type: string
+              partner:
+                type: string
+              amount:
+                type: number
+              due_date:
+                type: string
+                format: date
+        currency:
+          type: string
+          default: USD
+
+    ExpenseSummary:
+      type: object
+      required:
+        - total
+        - by_category
+      properties:
+        total:
+          type: number
+          format: float
+        vs_budget:
+          type: string
+          enum: [under, on, over]
+        by_category:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              amount:
+                type: number
+              budget:
+                type: number
+              status:
+                type: string
+                enum: [under, on, over]
+        currency:
+          type: string
+          default: USD
+
+    TaskSummary:
+      type: object
+      required:
+        - completed_count
+        - pending_count
+        - completion_rate
+      properties:
+        completed_count:
+          type: integer
+        pending_count:
+          type: integer
+        completion_rate:
+          type: number
+          format: float
+          description: Percentage (0-100)
+        highlights:
+          type: array
+          items:
+            type: string
+          description: Notable completed tasks
+        by_type:
+          type: object
+          additionalProperties:
+            type: integer
+
+    BottleneckAnalysis:
+      type: object
+      required:
+        - count
+        - items
+      properties:
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bottleneck'
+
+    Bottleneck:
+      type: object
+      required:
+        - title
+        - age_hours
+        - location
+      properties:
+        title:
+          type: string
+        age_hours:
+          type: integer
+          description: Hours since created/stalled
+        location:
+          type: string
+          enum: [needs_action, pending_approval, plans]
+        impact:
+          type: string
+        recommendation:
+          type: string
+
+    SuggestionRequest:
+      type: object
+      properties:
+        focus_areas:
+          type: array
+          items:
+            type: string
+            enum:
+              - cost_optimization
+              - efficiency
+              - revenue_growth
+              - risk_reduction
+          default:
+            - cost_optimization
+            - efficiency
+        min_savings_threshold:
+          type: number
+          default: 50
+          description: Minimum monthly savings to include
+
+    Suggestions:
+      type: object
+      required:
+        - suggestions
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Suggestion'
+
+    Suggestion:
+      type: object
+      required:
+        - title
+        - type
+        - description
+      properties:
+        title:
+          type: string
+        type:
+          type: string
+          enum: [cost_optimization, efficiency, revenue_growth, risk_reduction]
+        description:
+          type: string
+        potential_savings:
+          type: number
+          description: Monthly savings estimate
+        action_required:
+          type: string
+        evidence:
+          type: array
+          items:
+            type: string
+          description: Data points supporting suggestion
+
+    GoalsProgress:
+      type: object
+      properties:
+        goals:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              target:
+                type: string
+              actual:
+                type: string
+              progress_percent:
+                type: number
+              status:
+                type: string
+                enum: [exceeding, on_track, needs_attention, at_risk]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        partial_result:
+          type: object
+          description: Partial briefing if timeout occurred

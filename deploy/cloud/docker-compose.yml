@@ -1,0 +1,116 @@
+# Docker Compose for Odoo Deployment
+# AI Employee Platinum Tier - Cloud Agent
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose logs -f
+#   docker-compose down
+#
+# Backup:
+#   docker exec postgres pg_dump -U odoo odoo > backup.sql
+#
+# Note: Create .env file with POSTGRES_PASSWORD before starting
+
+version: '3.8'
+
+services:
+  odoo:
+    image: odoo:17.0
+    container_name: ai-employee-odoo
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8069:8069"
+      - "127.0.0.1:8072:8072"  # Longpolling
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - ./odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./addons:/mnt/extra-addons:ro
+    environment:
+      - HOST=db
+      - USER=odoo
+      - PASSWORD=${POSTGRES_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - ai-employee-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8069/web/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  db:
+    image: postgres:15-alpine
+    container_name: ai-employee-postgres
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data/pgdata
+    restart: unless-stopped
+    networks:
+      - ai-employee-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Performance tuning
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "default_statistics_target=100"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "work_mem=4MB"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+
+  # Optional: pgAdmin for database management
+  # Uncomment if needed for debugging
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: ai-employee-pgadmin
+  #   environment:
+  #     - PGADMIN_DEFAULT_EMAIL=admin@example.com
+  #     - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-changeme}
+  #   ports:
+  #     - "127.0.0.1:5050:80"
+  #   restart: unless-stopped
+  #   networks:
+  #     - ai-employee-network
+  #   depends_on:
+  #     - db
+
+volumes:
+  odoo-data:
+    name: ai-employee-odoo-data
+  postgres-data:
+    name: ai-employee-postgres-data
+
+networks:
+  ai-employee-network:
+    name: ai-employee-network
+    driver: bridge

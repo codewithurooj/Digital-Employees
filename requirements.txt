@@ -1,0 +1,31 @@
+# AI Employee Dependencies
+# Install with: pip install -r requirements.txt
+# Or with UV: uv pip install -r requirements.txt
+
+# Core Dependencies
+watchdog>=4.0.0          # File system monitoring
+python-dotenv>=1.0.0     # Environment variable management
+
+# Google APIs (for Gmail Watcher - Silver Tier)
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+
+# Browser Automation (for WhatsApp Watcher - Silver Tier)
+playwright>=1.40.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# Data Validation
+pydantic>=2.5.0
+
+# Scheduling
+schedule>=1.2.0
+
+# Development Dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.7.0

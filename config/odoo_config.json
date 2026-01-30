@@ -1,0 +1,12 @@
+{
+  "url": "",
+  "database": "",
+  "username": "",
+  "api_key": "",
+  "last_sync": null,
+  "sync_interval": 300,
+  "models_enabled": [
+    "account.move",
+    "account.payment"
+  ]
+}

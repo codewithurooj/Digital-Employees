@@ -1,0 +1,393 @@
+openapi: 3.0.3
+info:
+  title: Odoo MCP Server API
+  description: |
+    MCP Server for Odoo accounting integration.
+    Handles invoice sync, payment tracking, and draft invoice creation.
+  version: 1.0.0
+  contact:
+    name: AI Employee Gold Tier
+
+servers:
+  - url: http://localhost:8001
+    description: Local MCP Server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Server is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/invoices:
+    post:
+      summary: Sync invoices from Odoo to vault
+      operationId: syncInvoices
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since:
+                  type: string
+                  format: date-time
+                  description: Only sync invoices modified after this timestamp
+                states:
+                  type: array
+                  items:
+                    type: string
+                    enum: [draft, posted, cancel]
+                  default: [posted]
+                  description: Invoice states to sync
+      responses:
+        '200':
+          description: Sync completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+        '401':
+          description: Odoo authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Odoo service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sync/payments:
+    post:
+      summary: Sync payments from Odoo to vault
+      operationId: syncPayments
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since:
+                  type: string
+                  format: date-time
+                  description: Only sync payments after this timestamp
+                payment_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: [inbound, outbound]
+                  default: [inbound, outbound]
+      responses:
+        '200':
+          description: Sync completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+        '401':
+          description: Odoo authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Odoo service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/draft:
+    post:
+      summary: Create a draft invoice in Odoo
+      description: |
+        Creates an invoice in draft status. Requires human approval
+        before the invoice can be posted/sent.
+      operationId: createDraftInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftInvoiceRequest'
+      responses:
+        '201':
+          description: Draft invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          description: Invalid invoice data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Odoo authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /accounts/balance:
+    get:
+      summary: Get current account balances
+      operationId: getAccountBalance
+      parameters:
+        - name: account_types
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [receivable, payable, bank, cash]
+          description: Filter by account types
+      responses:
+        '200':
+          description: Account balances retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountBalances'
+        '401':
+          description: Odoo authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions/daily:
+    get:
+      summary: Get daily transaction summary
+      operationId: getDailyTransactions
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Date to retrieve transactions for
+      responses:
+        '200':
+          description: Transaction summary retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyTransactions'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - odoo_connected
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        odoo_connected:
+          type: boolean
+        last_sync:
+          type: string
+          format: date-time
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    SyncResult:
+      type: object
+      required:
+        - success
+        - synced_count
+        - timestamp
+      properties:
+        success:
+          type: boolean
+        synced_count:
+          type: integer
+        created_files:
+          type: array
+          items:
+            type: string
+          description: Vault file paths created/updated
+        errors:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    DraftInvoiceRequest:
+      type: object
+      required:
+        - partner_name
+        - line_items
+      properties:
+        partner_name:
+          type: string
+          description: Customer name (will lookup or create in Odoo)
+        partner_email:
+          type: string
+          format: email
+        invoice_date:
+          type: string
+          format: date
+          description: Defaults to today if not specified
+        due_date:
+          type: string
+          format: date
+        currency:
+          type: string
+          default: USD
+        line_items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/InvoiceLineItem'
+        notes:
+          type: string
+
+    InvoiceLineItem:
+      type: object
+      required:
+        - description
+        - quantity
+        - unit_price
+      properties:
+        description:
+          type: string
+        quantity:
+          type: number
+          minimum: 0.01
+        unit_price:
+          type: number
+          minimum: 0
+        tax_percent:
+          type: number
+          default: 0
+
+    InvoiceResponse:
+      type: object
+      required:
+        - odoo_id
+        - number
+        - state
+      properties:
+        odoo_id:
+          type: integer
+        number:
+          type: string
+        state:
+          type: string
+          enum: [draft]
+        amount_total:
+          type: number
+        vault_file:
+          type: string
+          description: Path to vault file created
+        approval_required:
+          type: boolean
+          default: true
+          description: Always true - draft invoices need approval to send
+
+    AccountBalances:
+      type: object
+      properties:
+        receivable:
+          type: number
+          description: Total accounts receivable
+        payable:
+          type: number
+          description: Total accounts payable
+        bank:
+          type: number
+          description: Total bank balance
+        cash:
+          type: number
+          description: Total cash balance
+        timestamp:
+          type: string
+          format: date-time
+
+    DailyTransactions:
+      type: object
+      required:
+        - date
+        - total_inbound
+        - total_outbound
+      properties:
+        date:
+          type: string
+          format: date
+        total_inbound:
+          type: number
+        total_outbound:
+          type: number
+        net_change:
+          type: number
+        transaction_count:
+          type: integer
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+
+    Transaction:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        reference:
+          type: string
+        partner_name:
+          type: string
+        type:
+          type: string
+          enum: [inbound, outbound]
+        amount:
+          type: number
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+security:
+  - ApiKeyAuth: []

@@ -1,0 +1,481 @@
+openapi: 3.0.3
+info:
+  title: Social Media MCP Server API
+  description: |
+    MCP Server for social media integration.
+    Supports Facebook, Instagram, and Twitter/X posting with approval workflows.
+  version: 1.0.0
+  contact:
+    name: AI Employee Gold Tier
+
+servers:
+  - url: http://localhost:8002
+    description: Local MCP Server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /posts/draft:
+    post:
+      summary: Create a post draft for approval
+      description: |
+        Creates a draft post and saves it to the vault.
+        The draft must be approved before publishing.
+      operationId: createDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftPostRequest'
+      responses:
+        '201':
+          description: Draft created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /posts/validate:
+    post:
+      summary: Validate post content for a platform
+      description: |
+        Validates content against platform-specific rules without creating a draft.
+        Use this to check content before drafting.
+      operationId: validateContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+
+  /posts/{draft_id}/publish:
+    post:
+      summary: Publish an approved post
+      description: |
+        Publishes a post that has been approved via HITL workflow.
+        Requires approval_id to verify approval.
+      operationId: publishPost
+      parameters:
+        - name: draft_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Draft ID from vault file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - approval_id
+              properties:
+                approval_id:
+                  type: string
+                  description: Approval ID from HITL workflow
+      responses:
+        '200':
+          description: Post published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResponse'
+        '400':
+          description: Post not approved or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Approval not found or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /posts/{post_id}/engagement:
+    get:
+      summary: Get engagement metrics for a published post
+      operationId: getEngagement
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Platform post ID
+        - name: platform
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [facebook, instagram, twitter]
+      responses:
+        '200':
+          description: Engagement metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngagementMetrics'
+        '404':
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /platforms/{platform}/status:
+    get:
+      summary: Get platform connection status
+      operationId: getPlatformStatus
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [facebook, instagram, twitter]
+      responses:
+        '200':
+          description: Platform status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformStatus'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - platforms
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        platforms:
+          type: object
+          properties:
+            facebook:
+              type: boolean
+            instagram:
+              type: boolean
+            twitter:
+              type: boolean
+        rate_limits:
+          type: object
+          properties:
+            posts_today:
+              type: integer
+            posts_limit:
+              type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    DraftPostRequest:
+      type: object
+      required:
+        - platform
+        - content
+      properties:
+        platform:
+          type: string
+          enum: [facebook, instagram, twitter]
+        content:
+          type: string
+          description: Post text content
+          maxLength: 63206
+        content_type:
+          type: string
+          enum: [text, image, carousel, video]
+          default: text
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAttachment'
+          maxItems: 10
+        hashtags:
+          type: array
+          items:
+            type: string
+          description: Hashtags (without # prefix)
+        mentions:
+          type: array
+          items:
+            type: string
+          description: User mentions (without @ prefix)
+        scheduled_for:
+          type: string
+          format: date-time
+          description: Optional scheduled publish time
+        link_url:
+          type: string
+          format: uri
+          description: URL to include (Facebook/Twitter)
+
+    MediaAttachment:
+      type: object
+      required:
+        - type
+        - path
+      properties:
+        type:
+          type: string
+          enum: [image, video]
+        path:
+          type: string
+          description: Local file path or URL
+        alt_text:
+          type: string
+          description: Alt text for accessibility
+
+    DraftResponse:
+      type: object
+      required:
+        - draft_id
+        - vault_file
+        - validation
+      properties:
+        draft_id:
+          type: string
+        vault_file:
+          type: string
+          description: Path to draft file in vault
+        validation:
+          $ref: '#/components/schemas/ValidationResult'
+        approval_required:
+          type: boolean
+          default: true
+
+    ValidateRequest:
+      type: object
+      required:
+        - platform
+        - content
+      properties:
+        platform:
+          type: string
+          enum: [facebook, instagram, twitter]
+        content:
+          type: string
+        content_type:
+          type: string
+          enum: [text, image, carousel, video]
+          default: text
+        media:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaAttachment'
+
+    ValidationResult:
+      type: object
+      required:
+        - valid
+        - platform
+      properties:
+        valid:
+          type: boolean
+        platform:
+          type: string
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationCheck'
+        warnings:
+          type: array
+          items:
+            type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    ValidationCheck:
+      type: object
+      properties:
+        rule:
+          type: string
+          description: Rule name (e.g., "character_limit")
+        passed:
+          type: boolean
+        message:
+          type: string
+        current_value:
+          type: string
+        limit:
+          type: string
+
+    ValidationError:
+      type: object
+      required:
+        - error
+        - validation
+      properties:
+        error:
+          type: string
+          default: validation_failed
+        validation:
+          $ref: '#/components/schemas/ValidationResult'
+
+    PublishResponse:
+      type: object
+      required:
+        - success
+        - platform
+        - post_id
+      properties:
+        success:
+          type: boolean
+        platform:
+          type: string
+        post_id:
+          type: string
+          description: Platform-specific post ID
+        post_url:
+          type: string
+          format: uri
+          description: URL to view the published post
+        published_at:
+          type: string
+          format: date-time
+        vault_file_updated:
+          type: string
+          description: Path to updated vault file
+
+    EngagementMetrics:
+      type: object
+      required:
+        - post_id
+        - platform
+        - retrieved_at
+      properties:
+        post_id:
+          type: string
+        platform:
+          type: string
+        impressions:
+          type: integer
+        reach:
+          type: integer
+        likes:
+          type: integer
+        comments:
+          type: integer
+        shares:
+          type: integer
+        saves:
+          type: integer
+          description: Instagram only
+        retweets:
+          type: integer
+          description: Twitter only
+        quote_tweets:
+          type: integer
+          description: Twitter only
+        engagement_rate:
+          type: number
+          format: float
+          description: (interactions/reach) * 100
+        retrieved_at:
+          type: string
+          format: date-time
+
+    PlatformStatus:
+      type: object
+      required:
+        - platform
+        - connected
+      properties:
+        platform:
+          type: string
+        connected:
+          type: boolean
+        auth_method:
+          type: string
+          enum: [api, browser]
+        account_name:
+          type: string
+        rate_limit_remaining:
+          type: integer
+        rate_limit_reset:
+          type: string
+          format: date-time
+        last_post:
+          type: string
+          format: date-time
+
+    RateLimitError:
+      type: object
+      required:
+        - error
+        - retry_after
+      properties:
+        error:
+          type: string
+          default: rate_limit_exceeded
+        message:
+          type: string
+        retry_after:
+          type: integer
+          description: Seconds until rate limit resets
+        limit:
+          type: integer
+        current:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+security:
+  - ApiKeyAuth: []

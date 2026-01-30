@@ -1,0 +1,378 @@
+# Vault Synchronization Protocol Contract
+# Platinum Tier - Git-based Cloud/Local Sync
+
+openapi: 3.0.0
+info:
+  title: Vault Sync Protocol
+  version: 1.0.0
+  description: |
+    Protocol for synchronizing the Obsidian vault between cloud and local agents
+    using Git as the transport mechanism.
+
+    ## Key Principles
+    1. **Git as Source of Truth**: All state changes committed to Git
+    2. **Claim-by-Move**: First successful push wins task ownership
+    3. **Single-Writer Rule**: Dashboard.md written only by local agent
+    4. **Cloud writes to /Updates**: Local merges updates into Dashboard
+
+components:
+  schemas:
+    ClaimRequest:
+      type: object
+      required:
+        - task_path
+        - agent_id
+      properties:
+        task_path:
+          type: string
+          description: Path to task file in Needs_Action
+          example: /Needs_Action/email/TASK_20260128_001.md
+        agent_id:
+          type: string
+          enum: [cloud, local]
+          description: Agent attempting to claim
+        timeout_minutes:
+          type: integer
+          default: 15
+          description: Claim expiration time
+
+    ClaimResult:
+      type: object
+      required:
+        - success
+        - task_id
+        - agent_id
+      properties:
+        success:
+          type: boolean
+          description: Whether claim was successful
+        task_id:
+          type: string
+          description: Task identifier
+        agent_id:
+          type: string
+          enum: [cloud, local]
+        claimed_path:
+          type: string
+          description: New path in /In_Progress/{agent_id}/
+          example: /In_Progress/cloud/TASK_20260128_001.md
+        conflict:
+          type: boolean
+          description: True if another agent already claimed
+        conflicting_agent:
+          type: string
+          enum: [cloud, local]
+          description: Agent that already claimed (if conflict)
+
+    ReleaseRequest:
+      type: object
+      required:
+        - task_id
+        - agent_id
+      properties:
+        task_id:
+          type: string
+          description: Task to release
+        agent_id:
+          type: string
+          enum: [cloud, local]
+        reason:
+          type: string
+          enum: [completed, failed, timeout, manual]
+          default: completed
+        destination:
+          type: string
+          description: Where to move the file
+          example: /Done/TASK_20260128_001_done.md
+
+    PushRequest:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Commit message
+          default: "{agent_id}: auto-sync"
+        files:
+          type: array
+          items:
+            type: string
+          description: Specific files to commit (default all changes)
+
+    PushResult:
+      type: object
+      required:
+        - success
+        - timestamp
+      properties:
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        commit_hash:
+          type: string
+          description: New commit hash
+        files_committed:
+          type: array
+          items:
+            type: string
+        error:
+          type: string
+          description: Error message if failed
+        conflict:
+          type: boolean
+          description: True if push failed due to conflict
+
+    PullResult:
+      type: object
+      required:
+        - success
+        - timestamp
+      properties:
+        success:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+        commit_hash:
+          type: string
+          description: Latest commit hash after pull
+        files_updated:
+          type: array
+          items:
+            type: string
+        new_approvals:
+          type: integer
+          description: New files in Pending_Approval
+        new_updates:
+          type: integer
+          description: New files in Updates folder
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              file:
+                type: string
+              resolution:
+                type: string
+                enum: [auto_theirs, auto_ours, manual_required]
+
+    SyncState:
+      type: object
+      required:
+        - agent_id
+        - last_sync
+      properties:
+        agent_id:
+          type: string
+          enum: [cloud, local]
+        last_pull:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            commit_hash:
+              type: string
+            success:
+              type: boolean
+        last_push:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            commit_hash:
+              type: string
+            success:
+              type: boolean
+        consecutive_failures:
+          type: integer
+        pending_changes:
+          type: array
+          items:
+            type: string
+
+paths:
+  /claim:
+    post:
+      operationId: claim_task
+      summary: Claim a task for processing
+      description: |
+        Attempts to claim a task by moving it to /In_Progress/{agent_id}/.
+        Uses Git push to ensure atomic ownership.
+
+        ## Protocol
+        1. git pull (sync first)
+        2. Move file: Needs_Action → In_Progress/{agent_id}/
+        3. Add claim metadata to file frontmatter
+        4. git add, commit, push
+        5. If push succeeds: claim successful
+        6. If push fails (conflict): another agent claimed first
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimRequest'
+      responses:
+        '200':
+          description: Claim result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResult'
+        '409':
+          description: Conflict - another agent claimed first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResult'
+
+  /release:
+    post:
+      operationId: release_task
+      summary: Release a claimed task
+      description: |
+        Releases a task after processing is complete.
+        Moves to appropriate destination folder.
+
+        ## Destinations
+        - completed: /Done/{filename}
+        - pending_approval: /Pending_Approval/{domain}/{filename}
+        - failed: /Needs_Action/{domain}/{filename} (back to queue)
+        - timeout: /Needs_Action/{domain}/{filename} (auto-release)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseRequest'
+      responses:
+        '200':
+          description: Release successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  new_path:
+                    type: string
+
+  /push:
+    post:
+      operationId: push_changes
+      summary: Commit and push changes to remote
+      description: |
+        Commits pending changes and pushes to the remote repository.
+
+        ## Cloud Agent Behavior
+        - Auto-push after each task completion
+        - Message format: "cloud: {task_summary}"
+
+        ## Local Agent Behavior
+        - Push after approvals processed
+        - Message format: "local: {action_summary}"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushRequest'
+      responses:
+        '200':
+          description: Push successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushResult'
+        '409':
+          description: Push conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushResult'
+
+  /pull:
+    post:
+      operationId: pull_changes
+      summary: Pull latest changes from remote
+      description: |
+        Pulls latest changes from remote repository.
+
+        ## Local Agent Behavior
+        - Pull on startup
+        - Pull every 60 seconds
+        - Process new files in Pending_Approval
+        - Merge files from /Updates into Dashboard.md
+
+        ## Conflict Resolution
+        - Dashboard.md: local always wins (theirs)
+        - In_Progress files: first agent wins
+        - Other files: newest timestamp wins
+      responses:
+        '200':
+          description: Pull successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullResult'
+        '409':
+          description: Conflicts detected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullResult'
+
+  /state:
+    get:
+      operationId: get_sync_state
+      summary: Get current sync state
+      responses:
+        '200':
+          description: Sync state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncState'
+
+# Sync Configuration
+x-sync-config:
+  intervals:
+    cloud_push_after_task: true
+    cloud_push_interval_seconds: 30
+    local_pull_on_startup: true
+    local_pull_interval_seconds: 60
+    claim_timeout_minutes: 15
+
+  conflict_resolution:
+    dashboard_md: local_wins
+    in_progress: first_mover_wins
+    needs_action: merge_both
+    pending_approval: timestamp_wins
+    default: timestamp_wins
+
+  gitignore_required:
+    - .env
+    - .env.*
+    - "*.env"
+    - config/gmail*.json
+    - config/whatsapp_session/
+    - config/*_token*
+    - "*.pem"
+    - "*.key"
+    - __pycache__/
+    - "*.pyc"
+    - .DS_Store
+    - node_modules/
+
+  commit_message_format:
+    cloud: "cloud: {action} - {summary}"
+    local: "local: {action} - {summary}"
+
+  single_writer_files:
+    - Dashboard.md  # Local only
+    - Health/status.md  # Cloud only

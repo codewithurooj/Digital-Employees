@@ -1,0 +1,124 @@
+# AI Employee Orchestrator Configuration
+# Gold Tier - Multiple MCP Servers and Scheduled Tasks
+
+version: "1.0"
+environment: development
+
+# MCP Server Definitions
+mcp_servers:
+  email:
+    module: src.mcp_servers.email_mcp
+    class: EmailMCP
+    enabled: true
+    rate_limit:
+      requests_per_hour: 10
+    circuit_breaker:
+      failure_threshold: 3
+      reset_timeout: 300
+    health_check:
+      interval: 60
+      timeout: 10
+
+  odoo:
+    module: src.mcp_servers.odoo_mcp
+    class: OdooMCP
+    enabled: true
+    rate_limit:
+      requests_per_hour: 100
+    circuit_breaker:
+      failure_threshold: 5
+      reset_timeout: 600
+    health_check:
+      interval: 120
+      timeout: 15
+
+  social:
+    module: src.mcp_servers.social_mcp
+    class: SocialMCP
+    enabled: true
+    rate_limit:
+      requests_per_day: 5
+    circuit_breaker:
+      failure_threshold: 3
+      reset_timeout: 900
+    health_check:
+      interval: 300
+      timeout: 30
+
+# Watcher Definitions
+watchers:
+  filesystem:
+    module: src.watchers.filesystem_watcher
+    class: FilesystemWatcher
+    enabled: true
+    config:
+      watch_path: ${FILESYSTEM_WATCH_PATH}
+      check_interval: ${FILESYSTEM_CHECK_INTERVAL}
+
+  gmail:
+    module: src.watchers.gmail_watcher
+    class: GmailWatcher
+    enabled: true
+    config:
+      credentials_path: ${GMAIL_CREDENTIALS_PATH}
+      token_path: ${GMAIL_TOKEN_PATH}
+      check_interval: ${GMAIL_CHECK_INTERVAL}
+      query: ${GMAIL_QUERY}
+
+  whatsapp:
+    module: src.watchers.whatsapp_watcher
+    class: WhatsAppWatcher
+    enabled: false
+    config:
+      session_path: ${WHATSAPP_SESSION_PATH}
+      check_interval: ${WHATSAPP_CHECK_INTERVAL}
+      headless: ${WHATSAPP_HEADLESS}
+
+  odoo:
+    module: src.watchers.odoo_watcher
+    class: OdooWatcher
+    enabled: true
+    config:
+      config_path: config/odoo_config.json
+      sync_interval: ${ODOO_SYNC_INTERVAL}
+
+# Scheduled Tasks
+scheduled_tasks:
+  ceo_briefing:
+    skill: ceo_briefing
+    schedule: "0 23 * * 0"  # Sunday 11 PM
+    enabled: true
+    timeout: 600  # 10 minutes
+
+  odoo_sync:
+    action: sync_odoo
+    schedule: "*/5 * * * *"  # Every 5 minutes
+    enabled: true
+    timeout: 60
+
+  engagement_fetch:
+    action: fetch_engagement
+    schedule: "0 * * * *"  # Every hour
+    enabled: true
+    timeout: 120
+
+  log_cleanup:
+    action: cleanup_logs
+    schedule: "0 3 * * *"  # Daily at 3 AM
+    enabled: true
+    retention_days: 90
+
+# Global Settings
+settings:
+  vault_path: ${VAULT_PATH}
+  dry_run: ${DRY_RUN}
+  log_level: ${LOG_LEVEL}
+  log_retention_days: ${LOG_RETENTION_DAYS}
+
+# Approval Thresholds
+approval:
+  auto_approve_threshold: ${AUTO_APPROVE_THRESHOLD}
+  require_approval_threshold: ${REQUIRE_APPROVAL_THRESHOLD}
+  social_posts_require_approval: true
+  payments_require_approval: true
+  invoices_send_require_approval: true
