@@ -93,9 +93,21 @@ class WhatsAppWatcher(BaseWatcher):
         self._browser: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
 
+    def _cleanup_session_locks(self) -> None:
+        """Remove stale Chromium lock files that cause crash-on-start."""
+        for lock_name in ('lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'):
+            lock_path = self.session_path / lock_name
+            if lock_path.exists():
+                try:
+                    lock_path.unlink()
+                    self.logger.info(f"Removed stale lock: {lock_name}")
+                except Exception as e:
+                    self.logger.warning(f"Could not remove {lock_name}: {e}")
+
     def _start_browser(self) -> bool:
         """Start Playwright browser with persistent context."""
         try:
+            self._cleanup_session_locks()
             self._playwright = sync_playwright().start()
 
             # Use persistent context to maintain WhatsApp login
@@ -106,7 +118,7 @@ class WhatsAppWatcher(BaseWatcher):
                     '--disable-blink-features=AutomationControlled',
                     '--no-sandbox'
                 ],
-                viewport={'width': 1280, 'height': 800}
+                viewport={'width': 800, 'height': 600}
             )
 
             self._page = self._browser.pages[0] if self._browser.pages else self._browser.new_page()
@@ -185,7 +197,9 @@ class WhatsAppWatcher(BaseWatcher):
 
                 if matched_keywords:
                     # Get full conversation
-                    full_messages = self._get_chat_messages(chat_info['name'])
+                    full_messages = self._get_chat_messages(
+                        chat_info['name'], element=chat_info.get('element')
+                    )
 
                     msg_id = f"{chat_info['name']}_{hash(chat_info['preview'])}_{datetime.now().strftime('%Y%m%d%H%M')}"
 
@@ -208,56 +222,52 @@ class WhatsAppWatcher(BaseWatcher):
         return messages
 
     def _find_unread_chats(self) -> List[Dict[str, Any]]:
-        """Find all chats with unread messages."""
+        """Find all chats with unread messages using current WhatsApp Web selectors."""
         unread_chats = []
 
         try:
-            # Wait for chat list
             self._page.wait_for_selector('[aria-label="Chat list"]', timeout=10000)
 
-            # Find chat items with unread badges
-            chat_items = self._page.query_selector_all('[data-testid="cell-frame-container"]')
+            # WhatsApp Web now uses role="row" for chat items
+            rows = self._page.query_selector_all('[role="row"]')
 
-            for chat in chat_items:
+            for row in rows:
                 try:
-                    # Check for unread indicator
-                    unread_badge = chat.query_selector('[data-testid="icon-unread-count"]')
-                    if not unread_badge:
-                        # Also check for unread dot
-                        unread_dot = chat.query_selector('[data-icon="unread-count"]')
-                        if not unread_dot:
+                    # Unread chats have an element with aria-label like "2 unread messages"
+                    unread_el = row.query_selector('[aria-label*="unread"]')
+                    if not unread_el:
+                        # Fallback: check raw HTML
+                        if 'unread' not in row.inner_html().lower():
                             continue
 
-                    # Get contact name
-                    name_element = chat.query_selector('[data-testid="cell-frame-title"]')
-                    name = name_element.inner_text().strip() if name_element else "Unknown"
+                    # Parse text content: "name\ntime\npreview\ncount"
+                    text = row.inner_text()
+                    lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    if not lines:
+                        continue
 
-                    # Get message preview
-                    preview_element = chat.query_selector('[data-testid="last-msg-status"]')
-                    preview = preview_element.inner_text().strip() if preview_element else ""
+                    name = lines[0]
+                    # Preview is 3rd line (index 2); fall back to 2nd
+                    preview = lines[2] if len(lines) > 2 else (lines[1] if len(lines) > 1 else '')
 
-                    if not preview:
-                        preview_element = chat.query_selector('span[dir="ltr"]')
-                        preview = preview_element.inner_text().strip() if preview_element else ""
-
-                    # Get unread count if available
+                    # Parse unread count from aria-label e.g. "2 unread messages"
                     unread_count = 1
-                    if unread_badge:
-                        try:
-                            count_text = unread_badge.inner_text().strip()
-                            unread_count = int(count_text) if count_text.isdigit() else 1
-                        except:
-                            pass
+                    if unread_el:
+                        import re as _re
+                        aria = unread_el.get_attribute('aria-label') or ''
+                        m = _re.search(r'\d+', aria)
+                        if m:
+                            unread_count = int(m.group())
 
                     unread_chats.append({
                         'name': name,
                         'preview': preview,
                         'unread_count': unread_count,
-                        'element': chat
+                        'element': row,
                     })
 
                 except Exception as e:
-                    self.logger.debug(f"Error parsing chat: {e}")
+                    self.logger.debug(f"Error parsing chat row: {e}")
                     continue
 
         except Exception as e:
@@ -265,49 +275,60 @@ class WhatsAppWatcher(BaseWatcher):
 
         return unread_chats
 
-    def _get_chat_messages(self, contact_name: str) -> List[Dict[str, str]]:
-        """Get recent messages from a specific chat."""
+    def _get_chat_messages(self, contact_name: str, element=None) -> List[Dict[str, str]]:
+        """Get recent messages by clicking the chat row directly."""
         messages = []
 
         try:
-            # Search for the contact
-            search_box = self._page.query_selector('[data-testid="chat-list-search"]')
-            if search_box:
-                search_box.click()
-                self._page.wait_for_timeout(500)
-                self._page.keyboard.type(contact_name)
-                self._page.wait_for_timeout(1000)
-
-                # Click on the contact
-                contact = self._page.query_selector(f'span[title="{contact_name}"]')
-                if contact:
-                    contact.click()
+            if element:
+                # Click the row we already found — fastest, no search needed
+                element.click()
+                self._page.wait_for_timeout(1500)
+            else:
+                # Fallback: try search box with updated selectors
+                search_box = self._page.query_selector(
+                    '[data-testid="chat-list-search"], '
+                    '[aria-label="Search input textbox"], '
+                    '[aria-label*="Search"]'
+                )
+                if search_box:
+                    search_box.click()
+                    self._page.wait_for_timeout(500)
+                    self._page.keyboard.type(contact_name)
                     self._page.wait_for_timeout(1000)
+                    result = self._page.query_selector(f'span[title="{contact_name}"], [role="row"]')
+                    if result:
+                        result.click()
+                        self._page.wait_for_timeout(1000)
 
-                    # Get messages
-                    msg_elements = self._page.query_selector_all('[data-testid="msg-container"]')
+            # Extract message text — try current and legacy selectors
+            msg_elements = self._page.query_selector_all(
+                '[data-testid="msg-container"], '
+                '[class*="message-in"], '
+                '[class*="message-out"]'
+            )
 
-                    for msg in msg_elements[-15:]:  # Last 15 messages
-                        try:
-                            text_element = msg.query_selector('[data-testid="conversation-compose-box-input"], span.selectable-text')
-                            if text_element:
-                                text = text_element.inner_text().strip()
-                                if text:
-                                    # Determine if incoming or outgoing
-                                    is_outgoing = 'message-out' in (msg.get_attribute('class') or '')
+            for msg in msg_elements[-15:]:
+                try:
+                    text_el = msg.query_selector(
+                        'span[dir="ltr"], span.selectable-text, span[dir="auto"]'
+                    )
+                    if text_el:
+                        text = text_el.inner_text().strip()
+                        if text:
+                            is_outgoing = 'message-out' in (msg.get_attribute('class') or '')
+                            messages.append({
+                                'text': text,
+                                'direction': 'outgoing' if is_outgoing else 'incoming'
+                            })
+                except:
+                    continue
 
-                                    messages.append({
-                                        'text': text,
-                                        'direction': 'outgoing' if is_outgoing else 'incoming'
-                                    })
-                        except:
-                            continue
-
-                # Clear search
-                self._page.keyboard.press('Escape')
+            # Go back to chat list
+            self._page.keyboard.press('Escape')
 
         except Exception as e:
-            self.logger.error(f"Error getting chat messages: {e}")
+            self.logger.error(f"Error getting chat messages for {contact_name}: {e}")
 
         return messages
 

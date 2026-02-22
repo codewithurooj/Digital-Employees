@@ -302,9 +302,21 @@ class LinkedInPostingSkill:
         """Extract @mentions from content."""
         return re.findall(r'@(\w+)', content)
 
+    def _cleanup_session_locks(self) -> None:
+        """Remove stale Chromium lock files that cause crash-on-start."""
+        for lock_name in ('lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'):
+            lock_path = self.session_path / lock_name
+            if lock_path.exists():
+                try:
+                    lock_path.unlink()
+                    self.logger.info(f"Removed stale lock: {lock_name}")
+                except Exception as e:
+                    self.logger.warning(f"Could not remove {lock_name}: {e}")
+
     def _start_browser(self) -> bool:
         """Start Playwright browser."""
         try:
+            self._cleanup_session_locks()
             self._playwright = sync_playwright().start()
             self._browser = self._playwright.chromium.launch_persistent_context(
                 str(self.session_path),
@@ -336,15 +348,19 @@ class LinkedInPostingSkill:
         """Ensure user is logged into LinkedIn."""
         try:
             self._page.goto('https://www.linkedin.com/feed/', wait_until='domcontentloaded')
-            self._page.wait_for_timeout(2000)
+            self._page.wait_for_timeout(3000)
 
-            # Check for login form
-            login_form = self._page.query_selector('input[id="session_key"]')
-            if login_form:
+            # Check URL — redirected to login/authwall means not logged in
+            current_url = self._page.url
+            if 'login' in current_url or 'authwall' in current_url or 'checkpoint' in current_url:
                 self.logger.warning("Not logged into LinkedIn - manual login required")
-                # Wait for user to log in
-                self._page.wait_for_selector('div.feed-shared-update-v2', timeout=120000)
+                print("\n>>> Please log in to LinkedIn in the browser window.")
+                print(">>> Waiting up to 2 minutes for login...")
+                # Wait for redirect back to feed after successful login
+                self._page.wait_for_url('**/feed/**', timeout=120000)
+                self._page.wait_for_timeout(2000)
 
+            self.logger.info("LinkedIn login confirmed")
             return True
         except Exception as e:
             self.logger.error(f"Login check failed: {e}")

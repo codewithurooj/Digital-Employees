@@ -1,0 +1,22 @@
+2026-02-22 20:58:59,475 - Orchestrator - INFO - Orchestrator initialized. Vault: AI_Employee_Vault
+2026-02-22 20:58:59,477 - Orchestrator - INFO - Dry run mode: True
+2026-02-22 21:00:14,324 - Orchestrator - INFO - Scheduler: registered 'ceo_briefing' -> cron '0 23 * * 0'
+2026-02-22 21:00:14,325 - Orchestrator - INFO - Scheduler: registered 'odoo_sync' -> cron '*/5 * * * *'
+2026-02-22 21:00:14,326 - Orchestrator - INFO - Scheduler: registered 'engagement_fetch' -> cron '0 * * * *'
+2026-02-22 21:00:14,326 - Orchestrator - INFO - Scheduler: registered 'log_cleanup' -> cron '0 3 * * *'
+2026-02-22 21:00:14,327 - Orchestrator - INFO - Orchestrator initialized. Vault: AI_Employee_Vault
+2026-02-22 21:00:14,327 - Orchestrator - INFO - Dry run mode: True
+2026-02-22 21:01:59,079 - Orchestrator - INFO - Scheduler: registered 'ceo_briefing' -> cron '0 23 * * 0'
+2026-02-22 21:01:59,080 - Orchestrator - INFO - Scheduler: registered 'odoo_sync' -> cron '*/5 * * * *'
+2026-02-22 21:01:59,081 - Orchestrator - INFO - Scheduler: registered 'engagement_fetch' -> cron '0 * * * *'
+2026-02-22 21:01:59,081 - Orchestrator - INFO - Scheduler: registered 'log_cleanup' -> cron '0 3 * * *'
+2026-02-22 21:01:59,082 - Orchestrator - INFO - Orchestrator initialized. Vault: AI_Employee_Vault
+2026-02-22 21:01:59,082 - Orchestrator - INFO - Dry run mode: True
+2026-02-22 21:01:59,084 - Orchestrator - INFO - [Scheduler] Running CEO Briefing job
+2026-02-22 21:01:59,104 - Orchestrator - INFO - [Scheduler][DRY RUN] Would generate CEO briefing
+2026-02-22 21:01:59,111 - Orchestrator - INFO - [Scheduler] Running Odoo sync job
+2026-02-22 21:01:59,129 - Orchestrator - INFO - [Scheduler][DRY RUN] Would sync Odoo
+2026-02-22 21:01:59,132 - Orchestrator - INFO - [Scheduler] Running engagement fetch job
+2026-02-22 21:01:59,149 - Orchestrator - INFO - [Scheduler][DRY RUN] Would fetch engagement metrics
+2026-02-22 21:01:59,157 - Orchestrator - INFO - [Scheduler] Running log cleanup (retain 90 days)
+2026-02-22 21:01:59,179 - Orchestrator - INFO - [Scheduler] Log cleanup done: 0 file(s) removed

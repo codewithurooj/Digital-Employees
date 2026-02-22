@@ -101,9 +101,21 @@ class LinkedInWatcher(BaseWatcher):
         self._browser: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
 
+    def _cleanup_session_locks(self) -> None:
+        """Remove stale Chromium lock files that cause crash-on-start."""
+        for lock_name in ('lockfile', 'SingletonLock', 'SingletonCookie', 'SingletonSocket'):
+            lock_path = self.session_path / lock_name
+            if lock_path.exists():
+                try:
+                    lock_path.unlink()
+                    self.logger.info(f"Removed stale lock: {lock_name}")
+                except Exception as e:
+                    self.logger.warning(f"Could not remove {lock_name}: {e}")
+
     def _start_browser(self) -> bool:
         """Start Playwright browser with persistent context."""
         try:
+            self._cleanup_session_locks()
             self._playwright = sync_playwright().start()
 
             # Use persistent context to maintain LinkedIn login
@@ -114,7 +126,7 @@ class LinkedInWatcher(BaseWatcher):
                     '--disable-blink-features=AutomationControlled',
                     '--no-sandbox'
                 ],
-                viewport={'width': 1280, 'height': 900},
+                viewport={'width': 800, 'height': 600},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             )
 
@@ -130,15 +142,15 @@ class LinkedInWatcher(BaseWatcher):
             self.logger.error(f"Failed to start browser: {e}")
             return False
 
-    def _wait_for_login(self, timeout: int = 120000) -> bool:
+    def _wait_for_login(self, timeout: int = 300000) -> bool:
         """Wait for user to log in manually."""
         try:
             self.logger.info("Waiting for LinkedIn login...")
 
             # Check if already logged in (feed visible) or need login
             self._page.wait_for_selector(
-                'div.feed-shared-update-v2, input[id="session_key"]',
-                timeout=30000
+                'div.feed-shared-update-v2, input[id="session_key"], input[id="username"]',
+                timeout=120000
             )
 
             # Check if login form is shown

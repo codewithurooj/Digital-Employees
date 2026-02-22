@@ -1,0 +1,50 @@
+[
+  {
+    "timestamp": "2026-02-23T00:01:10.017591",
+    "watcher": "OdooWatcher",
+    "action_type": "connection_error",
+    "details": {
+      "error": "Connection failed: unsupported XML-RPC protocol"
+    }
+  },
+  {
+    "timestamp": "2026-02-23T00:03:21.851319",
+    "watcher": "OdooWatcher",
+    "action_type": "connection_error",
+    "details": {
+      "error": "Connection failed: unsupported XML-RPC protocol"
+    }
+  },
+  {
+    "timestamp": "2026-02-23T00:06:39.316111",
+    "watcher": "OdooWatcher",
+    "action_type": "connection_error",
+    "details": {
+      "error": "Connection failed: Authentication failed for user YOUR_EMAIL_HERE"
+    }
+  },
+  {
+    "timestamp": "2026-02-23T00:08:07.760979",
+    "watcher": "OdooWatcher",
+    "action_type": "connection_error",
+    "details": {
+      "error": "Connection failed: Authentication failed for user YOUR_EMAIL_HERE"
+    }
+  },
+  {
+    "timestamp": "2026-02-23T00:11:04.325231",
+    "watcher": "OdooWatcher",
+    "action_type": "connection_error",
+    "details": {
+      "error": "Connection failed: Authentication failed for user fatimaurooj152@gmail.com"
+    }
+  },
+  {
+    "timestamp": "2026-02-23T00:22:43.119414",
+    "watcher": "OdooWatcher",
+    "action_type": "connection_error",
+    "details": {
+      "error": "Failed after 3 attempts: XML-RPC fault: <Fault 1: 'Traceback (most recent call last):\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/orm/models.py\", line 3103, in _determine_fields_to_fetch\\n    field = self._fields[field_name]\\n            ~~~~~~~~~~~~^^^^^^^^^^^^\\nKeyError: \\'ref\\'\\n\\nThe above exception was the direct cause of the following exception:\\n\\nTraceback (most recent call last):\\n  File \"/home/odoo/src/odoo/saas-19.1/addons/rpc/controllers/xmlrpc.py\", line 163, in xmlrpc_2\\n    response = self._xmlrpc(service)\\n               ^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/custom/trial/saas_trial/controllers/main.py\", line 467, in _xmlrpc\\n    res = super()._xmlrpc(service)\\n          ^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/addons/rpc/controllers/xmlrpc.py\", line 135, in _xmlrpc\\n    result = dispatch_rpc(service, method, params)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/http.py\", line 466, in dispatch_rpc\\n    return dispatch(method, params)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/service/model.py\", line 91, in dispatch\\n    res = execute_cr(cr, uid, model, method_, args, kw)\\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/service/model.py\", line 108, in execute_cr\\n    result = http.retrying(partial(call_kw, recs, method, args, kw), env)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/http.py\", line 509, in retrying\\n    result = func()\\n             ^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/service/model.py\", line 56, in call_kw\\n    result = method(recs, *args, **kwargs)\\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/orm/models.py\", line 5093, in search_read\\n    records = self.search_fetch(domain or [], fields, offset=offset, limit=limit, order=order)\\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/orm/models.py\", line 1437, in search_fetch\\n    fields_to_fetch = self._determine_fields_to_fetch(field_names)\\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \"/home/odoo/src/odoo/saas-19.1/odoo/orm/models.py\", line 3105, in _determine_fields_to_fetch\\n    raise ValueError(f\"Invalid field {field_name!r} on {self._name!r}\") from e\\nValueError: Invalid field \\'ref\\' on \\'account.payment\\'\\n'>"
+    }
+  }
+]

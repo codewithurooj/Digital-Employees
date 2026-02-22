@@ -1,0 +1,383 @@
+[
+  {
+    "timestamp": "2026-02-22T10:26:53.970897",
+    "watcher": "FileSystemWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "mode": "observer",
+      "watch_folder": "AI_Employee_Vault\\Drop"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:27:17.328469",
+    "watcher": "FileSystemWatcher",
+    "action_type": "file_processed",
+    "details": {
+      "original_file": "AI_Employee_Vault\\Drop\\testing.txt",
+      "action_file": "AI_Employee_Vault\\Needs_Action\\FILE_20260222_102717_testing.md",
+      "size": 45
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:31:32.635927",
+    "watcher": "FileSystemWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "mode": "observer"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:37:51.231224",
+    "watcher": "GmailWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 120
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:37:54.266157",
+    "watcher": "GmailWatcher",
+    "action_type": "item_created",
+    "details": {
+      "filepath": "AI_Employee_Vault\\Needs_Action\\EMAIL_20260222_103754_Blank_Metal_just_posted_a_81%_match_Asso.md",
+      "item_summary": "{'id': '19c793802d7f7e32', 'threadId': '19c793802d7f7e32', 'labelIds': ['UNREAD', 'IMPORTANT', 'CATE"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:37:54.300643",
+    "watcher": "GmailWatcher",
+    "action_type": "item_created",
+    "details": {
+      "filepath": "AI_Employee_Vault\\Needs_Action\\EMAIL_20260222_103754_Let's_Land_your_Next_Role!_New_Jobs_are.md",
+      "item_summary": "{'id': '19c72bf20131f66f', 'threadId': '19c72bf20131f66f', 'labelIds': ['CATEGORY_PROMOTIONS', 'UNRE"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:37:54.330005",
+    "watcher": "GmailWatcher",
+    "action_type": "item_created",
+    "details": {
+      "filepath": "AI_Employee_Vault\\Needs_Action\\EMAIL_20260222_103754_Verify_your_Panaversity_SSO_account.md",
+      "item_summary": "{'id': '19c37841f5e1db5b', 'threadId': '19c37841f5e1db5b', 'labelIds': ['UNREAD', 'IMPORTANT', 'CATE"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:37:54.357355",
+    "watcher": "GmailWatcher",
+    "action_type": "item_created",
+    "details": {
+      "filepath": "AI_Employee_Vault\\Needs_Action\\EMAIL_20260222_103754_Secure_link_to_log_in_to_Claude.ai_20.md",
+      "item_summary": "{'id': '19c364f41a652e56', 'threadId': '19c364f41a652e56', 'labelIds': ['UNREAD', 'IMPORTANT', 'CATE"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:37:54.387544",
+    "watcher": "GmailWatcher",
+    "action_type": "item_created",
+    "details": {
+      "filepath": "AI_Employee_Vault\\Needs_Action\\EMAIL_20260222_103754_Verify_your_n8n_account.md",
+      "item_summary": "{'id': '19b92a07eb96289e', 'threadId': '19b92a07eb96289e', 'labelIds': ['UNREAD', 'IMPORTANT', 'CATE"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:46:42.513380",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:51:09.005405",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:55:52.198848",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:55:56.808100",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:57:21.625042",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:57:55.556113",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T10:58:06.677771",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:04:25.223539",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:04:35.478785",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:07:13.282947",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:19:44.387146",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:19:56.064350",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "item_created",
+    "details": {
+      "filepath": "AI_Employee_Vault\\Needs_Action\\WHATSAPP_20260222_111956_+92_308_9199811.md",
+      "contact": "+92 308 9199811",
+      "keywords": [
+        "important"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:28:17.427345",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:28:25.534330",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 30
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:28:30.777512",
+    "watcher": "WhatsAppWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:28:44.025433",
+    "watcher": "FileSystemWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "mode": "observer",
+      "watch_folder": "AI_Employee_Vault\\Drop"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T11:29:05.923751",
+    "watcher": "FileSystemWatcher",
+    "action_type": "file_processed",
+    "details": {
+      "original_file": "AI_Employee_Vault\\Drop\\INVOICE_ClientA_January2026 - Copy.md",
+      "action_file": "AI_Employee_Vault\\Needs_Action\\FILE_20260222_112905_INVOICE_ClientA_January2026 -.md",
+      "size": 726
+    }
+  },
+  {
+    "timestamp": "2026-02-22T14:35:59.478599",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 120
+    }
+  },
+  {
+    "timestamp": "2026-02-22T14:37:29.887786",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T14:37:40.993207",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 120
+    }
+  },
+  {
+    "timestamp": "2026-02-22T15:29:32.265950",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T19:49:04.850675",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 120
+    }
+  },
+  {
+    "timestamp": "2026-02-22T19:53:35.199780",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T20:00:01.946047",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "interval": 120
+    }
+  },
+  {
+    "timestamp": "2026-02-22T20:30:09.660423",
+    "watcher": "LinkedInWatcher",
+    "action_type": "watcher_stopped",
+    "details": {
+      "reason": "run_complete"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T20:31:40.680649",
+    "component": "LinkedInPostingSkill",
+    "operation": "post_published",
+    "details": {
+      "approval_id": "LINKEDIN_20260222_143000_ai_automation_post",
+      "post_content": "Excited about building AI automation systems in 2026! Our Digital Employee works 24/7 managing emails, WhatsApp, and business tasks autonomously. The future of work is here. #AI #Automation #DigitalEmployee",
+      "status": "published",
+      "published_at": "2026-02-22T20:31:40.680677",
+      "method": "post_linkedin.py via persistent linkedin_session"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T20:49:54.845465",
+    "component": "EmailMCPServer",
+    "operation": "draft_email",
+    "details": {
+      "draft_id": "DRAFT_MOCK_001",
+      "has_recipients": true,
+      "has_subject": true
+    }
+  },
+  {
+    "timestamp": "2026-02-22T20:49:54.861832",
+    "component": "EmailMCPServer",
+    "operation": "send_email",
+    "details": {
+      "message_id": "MSG_SENT_MOCK_001",
+      "thread_id": "THREAD_MOCK_001",
+      "recipients": 1,
+      "approval_id": "APPROVAL_email_test_20260222"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:01:59.086254",
+    "component": "Orchestrator",
+    "event": "scheduled_job_start",
+    "details": {
+      "job": "ceo_briefing"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:01:59.112992",
+    "component": "Orchestrator",
+    "event": "scheduled_job_start",
+    "details": {
+      "job": "sync_odoo"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:01:59.134107",
+    "component": "Orchestrator",
+    "event": "scheduled_job_start",
+    "details": {
+      "job": "fetch_engagement"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:01:59.159435",
+    "component": "Orchestrator",
+    "event": "scheduled_job_start",
+    "details": {
+      "job": "cleanup_logs",
+      "retention_days": 90
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:01:59.180907",
+    "component": "Orchestrator",
+    "event": "scheduled_job_done",
+    "details": {
+      "job": "cleanup_logs",
+      "removed": 0
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:11:24.179390",
+    "watcher": "FileSystemWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "mode": "observer",
+      "watch_folder": "AI_Employee_Vault\\Drop"
+    }
+  },
+  {
+    "timestamp": "2026-02-22T21:11:52.499593",
+    "watcher": "FileSystemWatcher",
+    "action_type": "file_processed",
+    "details": {
+      "original_file": "AI_Employee_Vault\\Drop\\CLAUDE.md",
+      "action_file": "AI_Employee_Vault\\Needs_Action\\FILE_20260222_211152_CLAUDE.md",
+      "size": 29176
+    }
+  }
+]

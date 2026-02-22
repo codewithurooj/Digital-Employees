@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-02-05T20:40:40.164390",
+    "watcher": "FileSystemWatcher",
+    "action_type": "watcher_started",
+    "details": {
+      "mode": "observer",
+      "watch_folder": "AI_Employee_Vault\\Drop"
+    }
+  }
+]

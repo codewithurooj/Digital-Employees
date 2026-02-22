@@ -22,11 +22,16 @@ import signal
 import logging
 import argparse
 import threading
+import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, Future
+
+import yaml
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -54,6 +59,9 @@ class OrchestratorConfig:
     filesystem_watch_folder: Optional[str] = None
     linkedin_session: Optional[str] = None
     linkedin_keywords: Optional[List[str]] = None
+
+    # Scheduler config
+    scheduler_config_path: str = './config/orchestrator.yaml'
 
     # Reasoning loop config
     enable_reasoning_loop: bool = True
@@ -112,6 +120,10 @@ class Orchestrator:
         self.is_running = False
         self.start_time: Optional[datetime] = None
         self._shutdown_event = threading.Event()
+
+        # Scheduler
+        self.scheduler = BackgroundScheduler(timezone='UTC')
+        self._setup_scheduler()
 
         # Reasoning loop
         self.reasoning_loop: Optional[RalphWiggumLoop] = None
@@ -217,6 +229,176 @@ class Orchestrator:
 
             except Exception as e:
                 self.logger.error(f"Failed to initialize {watcher_name} watcher: {e}")
+
+    # ------------------------------------------------------------------
+    # Scheduler
+    # ------------------------------------------------------------------
+
+    def _load_yaml_config(self) -> dict:
+        """Load orchestrator.yaml; return empty dict on any error."""
+        config_path = Path(self.config.scheduler_config_path)
+        if not config_path.exists():
+            self.logger.warning(f"Scheduler config not found: {config_path}")
+            return {}
+        try:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f) or {}
+        except Exception as e:
+            self.logger.error(f"Failed to load scheduler config: {e}")
+            return {}
+
+    def _setup_scheduler(self) -> None:
+        """Register cron jobs from orchestrator.yaml scheduled_tasks section."""
+        yaml_cfg = self._load_yaml_config()
+        tasks = yaml_cfg.get('scheduled_tasks', {})
+
+        if not tasks:
+            self.logger.info("No scheduled tasks found in config")
+            return
+
+        # Map task names / action values to handler methods
+        handlers = {
+            # skill-based tasks
+            'ceo_briefing': self._job_ceo_briefing,
+            # action-based tasks
+            'sync_odoo':        self._job_sync_odoo,
+            'fetch_engagement': self._job_fetch_engagement,
+            'cleanup_logs':     self._job_cleanup_logs,
+        }
+
+        for task_name, task_cfg in tasks.items():
+            if not task_cfg.get('enabled', True):
+                self.logger.info(f"Scheduler: '{task_name}' is disabled, skipping")
+                continue
+
+            cron_expr = task_cfg.get('schedule', '')
+            if not cron_expr:
+                self.logger.warning(f"Scheduler: '{task_name}' has no schedule, skipping")
+                continue
+
+            # Resolve handler: prefer skill/action key, fall back to task_name
+            handler_key = task_cfg.get('skill') or task_cfg.get('action') or task_name
+            handler = handlers.get(handler_key)
+            if handler is None:
+                self.logger.warning(
+                    f"Scheduler: no handler for '{task_name}' (key='{handler_key}'), skipping"
+                )
+                continue
+
+            # Parse cron string "MIN HOUR DOM MON DOW"
+            parts = cron_expr.split()
+            if len(parts) != 5:
+                self.logger.error(f"Scheduler: invalid cron '{cron_expr}' for '{task_name}'")
+                continue
+
+            minute, hour, day, month, day_of_week = parts
+            trigger = CronTrigger(
+                minute=minute,
+                hour=hour,
+                day=day,
+                month=month,
+                day_of_week=day_of_week,
+                timezone='UTC',
+            )
+
+            # Pass retention_days for cleanup_logs
+            kwargs = {}
+            if handler_key == 'cleanup_logs':
+                kwargs['retention_days'] = task_cfg.get('retention_days', 90)
+
+            self.scheduler.add_job(
+                handler,
+                trigger=trigger,
+                id=task_name,
+                name=task_name,
+                kwargs=kwargs,
+                replace_existing=True,
+                misfire_grace_time=300,  # Allow up to 5-min late start
+            )
+            self.logger.info(f"Scheduler: registered '{task_name}' -> cron '{cron_expr}'")
+
+    # ------------------------------------------------------------------
+    # Job handlers
+    # ------------------------------------------------------------------
+
+    def _job_ceo_briefing(self) -> None:
+        """Generate the Monday Morning CEO Briefing."""
+        self.logger.info("[Scheduler] Running CEO Briefing job")
+        self._log_event('scheduled_job_start', {'job': 'ceo_briefing'})
+        try:
+            if self.config.dry_run:
+                self.logger.info("[Scheduler][DRY RUN] Would generate CEO briefing")
+                return
+
+            from src.skills.ceo_briefing import CEOBriefingSkill
+            skill = CEOBriefingSkill(vault_path=str(self.vault_path))
+            result = skill.generate_briefing()
+            self.logger.info(f"[Scheduler] CEO Briefing generated: {result}")
+            self._log_event('scheduled_job_done', {'job': 'ceo_briefing', 'result': str(result)})
+        except Exception as e:
+            self.logger.error(f"[Scheduler] CEO Briefing failed: {e}")
+            self._log_event('scheduled_job_error', {'job': 'ceo_briefing', 'error': str(e)})
+
+    def _job_sync_odoo(self) -> None:
+        """Trigger an Odoo sync check."""
+        self.logger.info("[Scheduler] Running Odoo sync job")
+        self._log_event('scheduled_job_start', {'job': 'sync_odoo'})
+        try:
+            if self.config.dry_run:
+                self.logger.info("[Scheduler][DRY RUN] Would sync Odoo")
+                return
+
+            from src.watchers.odoo_watcher import OdooWatcher
+            watcher = OdooWatcher(vault_path=str(self.vault_path))
+            items = watcher.check_for_updates()
+            for item in items:
+                watcher.create_action_file(item)
+            self.logger.info(f"[Scheduler] Odoo sync: {len(items)} item(s) queued")
+            self._log_event('scheduled_job_done', {'job': 'sync_odoo', 'items': len(items)})
+        except Exception as e:
+            self.logger.error(f"[Scheduler] Odoo sync failed: {e}")
+            self._log_event('scheduled_job_error', {'job': 'sync_odoo', 'error': str(e)})
+
+    def _job_fetch_engagement(self) -> None:
+        """Fetch social media engagement metrics."""
+        self.logger.info("[Scheduler] Running engagement fetch job")
+        self._log_event('scheduled_job_start', {'job': 'fetch_engagement'})
+        try:
+            if self.config.dry_run:
+                self.logger.info("[Scheduler][DRY RUN] Would fetch engagement metrics")
+                return
+
+            from src.skills.social_posting import SocialPostingSkill
+            skill = SocialPostingSkill(vault_path=str(self.vault_path))
+            summary = skill.fetch_engagement_summary()
+            self.logger.info(f"[Scheduler] Engagement fetched: {summary}")
+            self._log_event('scheduled_job_done', {'job': 'fetch_engagement', 'summary': str(summary)})
+        except Exception as e:
+            self.logger.error(f"[Scheduler] Engagement fetch failed: {e}")
+            self._log_event('scheduled_job_error', {'job': 'fetch_engagement', 'error': str(e)})
+
+    def _job_cleanup_logs(self, retention_days: int = 90) -> None:
+        """Delete log files older than retention_days."""
+        self.logger.info(f"[Scheduler] Running log cleanup (retain {retention_days} days)")
+        self._log_event('scheduled_job_start', {'job': 'cleanup_logs', 'retention_days': retention_days})
+        try:
+            cutoff = datetime.now() - timedelta(days=retention_days)
+            removed = 0
+            for log_file in self.logs_path.glob('*.json'):
+                # Filenames are YYYY-MM-DD.json
+                try:
+                    file_date = datetime.strptime(log_file.stem, '%Y-%m-%d')
+                    if file_date < cutoff:
+                        log_file.unlink()
+                        removed += 1
+                        self.logger.info(f"[Scheduler] Deleted old log: {log_file.name}")
+                except ValueError:
+                    pass  # Skip files that don't match date format
+            self.logger.info(f"[Scheduler] Log cleanup done: {removed} file(s) removed")
+            self._log_event('scheduled_job_done', {'job': 'cleanup_logs', 'removed': removed})
+        except Exception as e:
+            self.logger.error(f"[Scheduler] Log cleanup failed: {e}")
+            self._log_event('scheduled_job_error', {'job': 'cleanup_logs', 'error': str(e)})
 
     def _start_watcher(self, name: str, watcher: Any) -> None:
         """Start a watcher in a separate thread."""
@@ -626,6 +808,11 @@ Begin processing this task now.
             self._start_task_processor()
             self.logger.info("Task processor started (reasoning loop enabled)")
 
+        # Start APScheduler for cron-based tasks
+        self.scheduler.start()
+        job_count = len(self.scheduler.get_jobs())
+        self.logger.info(f"Scheduler started with {job_count} job(s)")
+
         # Log startup
         self._log_event('orchestrator_started', {
             'watchers': list(self.watchers.keys()),
@@ -676,6 +863,11 @@ Begin processing this task now.
                 watcher.stop()
             except:
                 pass
+
+        # Stop scheduler
+        if self.scheduler.running:
+            self.scheduler.shutdown(wait=False)
+            self.logger.info("Scheduler stopped")
 
         # Stop approval watcher
         if self.approval_watcher:
@@ -766,6 +958,11 @@ Examples:
         default='./config/linkedin_session',
         help='Path to LinkedIn session'
     )
+    parser.add_argument(
+        '--scheduler-config',
+        default='./config/orchestrator.yaml',
+        help='Path to scheduler YAML config (default: ./config/orchestrator.yaml)'
+    )
 
     # Reasoning loop arguments
     parser.add_argument(
@@ -816,6 +1013,7 @@ Examples:
         gmail_query=args.gmail_query,
         whatsapp_session=args.whatsapp_session,
         linkedin_session=args.linkedin_session,
+        scheduler_config_path=args.scheduler_config,
         enable_reasoning_loop=not args.disable_reasoning_loop,
         max_loop_iterations=args.max_loop_iterations,
         loop_timeout_seconds=args.loop_timeout,
@@ -845,6 +1043,7 @@ Examples:
         print(f"  - Max iterations: {config.max_loop_iterations}")
         print(f"  - Timeout: {config.loop_timeout_seconds}s per iteration")
         print(f"  - Task check interval: {config.task_process_interval}s")
+    print(f"Scheduler Config: {config.scheduler_config_path}")
     print("=" * 50)
     print("\nPress Ctrl+C to stop\n")
 
