@@ -9,6 +9,8 @@
 config/gmail_credentials.json
 config/gmail_token.json
 config/whatsapp_session/
+config/linkedin_session/
+config/odoo_config.json
 **/token.json
 **/credentials.json
 
